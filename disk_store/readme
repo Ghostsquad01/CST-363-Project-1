@@ -1,0 +1,132 @@
+Overview of disk_store package
+  not all variables and methods are listed in this overview. 
+
+HeapDB - the database table  (named Table in earlier assignments)
+   contains reference to the BlockFile used to read/write blocks to disk
+            reference to the Schema for the table
+            recSize -- length of each record
+            recsPerBlock -- number of records per block
+            blockMap -- file BitMap for free space  (Block 1 of file)
+            
+            recMap  -- temp BitMap for a data block read from file
+            buffer -- temp byte buffer for a data block read from file
+            
+            
+   
+            indexes - an array of current indices.  
+                       indexes[i] is the index on column number i or 
+                       null if column i does not have index
+   
+   open()   opens an existing database file
+            to create a new database, use the constructor  DBHeap(filename, schema)
+   
+   close()
+   
+   size()   scans the file and returns count of rows.  This method shows one way to 
+            do a linear scan of all rows in the table.  However it does not have 
+            access to the bitmaps or the actual blocks of the table.  For a more 
+            low level way to do a linear scan of all rows in the table see the method
+            toStringDiagnostic()
+   
+   insert(Record r) inserts a records.   
+            insert returns true, false if file is full or record is duplicate key.
+   
+   delete(int key) finds and delete row with key value. 
+             returns true,  false if key is not found.
+   
+   createOrderedIndex()  creates an index on the table for a particular column. Column must be int data type.
+   createHashindex() 
+   
+   initializeIndex()  used by create index to read all rows from the table and create index entries.
+   
+   lookup()  find a row either by key value or by using column name and value. 
+             lookup will either do a linear search or use an index if an index exists on the column.
+             returns the Record if found, or null if not found.
+             
+   lookupInBlock() searches a block for all rows with a column value.  
+             Returns a list of records found.
+             
+   recordLocation(int i)  returns the offset in the block to the start of the ith record. i=0,1,2...
+   
+   toStringDiagnostic( )  a method that prints out all rows. It is a good example of how to do a linear
+            scan of all blocks in the file and find all rows in each block.
+ 
+
+Schema - table definition 
+   contains a list of column names and column data types: IntType or StringType
+   The schema must have a primary key of int datatype.
+   
+   size()   returns number of columns
+   
+   getLen() returns the size in bytes of a row
+   
+   blank()  returns an empty Record with default values (row)
+   
+   getName(int i)              get the Name of column i
+   getType(String columnName)  get the type of the column
+   getType(int i)              get the type of column i 
+   getKey()                    get the name of the key column
+   getKeyIndex()               get column number of key column (0 based)
+   getFieldIndex(String columnName)  given column name, get the column number
+   
+   
+
+Record - row (named Tuple in earlier assignments)
+   contains a list of column values which are instances of IntField or StringField
+   
+   size()  return number of columns
+   
+   getSchema() 
+   
+   get/set(i)  get or set value of column number i (0 based)
+   
+   getKey()    return primary key value
+   
+   serialize() convert row into binary bytes
+   
+   deserialize()  convert binary bytes into column values replacing current values of this Record
+   
+OrdIndex
+	insert(key, blockNumber)  -- add index entry
+	delete(key, blockNumber)  -- remove index entry
+	lookup(key) -- search for key value and return list of block numbers.  The list is empty if the key is not found.
+	                There should not be any duplicate integers in the list of block numbers.
+	
+
+HashIndex
+	insert(key, blockNumber)  -- add index entry
+	delete(key, blockNumber)  -- remove index entry
+	lookup(key) -- search for key value and return list of block numbers.  The list is empty if the key is not found.
+	                There should not be any duplicate integers in the list of block numbers.
+
+Classes related to storing the database in a file
+
+  Bitmap  an array of bytes that can be manipulated a bits to keep track of freespace 
+  
+  BlockBuffer  a block of binary data.
+     buffer is the binary data in the form of a java.nio.ByteBuffer rather than byte[] for efficiency
+     
+  BlockedFile
+     open(file_name) static method.   Opens an existing file and returns a BlockedFile object.
+     close()
+     getBuffer()  returns an empty BlockBuffer 
+     read()  - read a block from file given the block number (first block in file is 0) and a BlockBuffer
+     write()
+     getLastBlockIndex() - return the index of the last block in the file.
+     
+File format - 4096 byte blocks.  See BlockFile.getLastBlockIndex() for last block in file.
+   Block 0 - used to write schema information
+   Block 1 - BitMap of size 4096 bytes,  or 32768 bits 
+             bit i = 0, block i has room for a record
+             bit i = 1, block i is full
+   Block 2+ - data blocks containing BitMap and n records.  n = HeapDB.recsPerBlock 
+       offset 
+       0               BitMap of size HeapDB.recMapSize bytes 
+                            containing 0 <= i < recsPerBlock
+                               bit i = 0  record i is free space
+                               bit i = 1  record i contains row data.  
+                                          Each row is fixed length = recSize.
+                               
+       recMapSize            start of slot 0
+       recMapSize+i*recSize  start of slot i  (0 <= i < recsPerBlock)
+             
