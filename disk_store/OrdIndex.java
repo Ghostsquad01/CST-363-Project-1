@@ -35,18 +35,45 @@ public class OrdIndex implements DBIndex {
 	public OrdIndex() {
 		entries = new ArrayList<>();
 	}
-	
+
+	// not completed
 	@Override
 	public List<Integer> lookup(int key) {
 		// binary search of entries arraylist
 		// return list of block numbers (no duplicates). 
 		// if key not found, return empty list
-		throw new UnsupportedOperationException();
+		int lo = 0;
+		int hi = entries.size()-1;
+		int mid;
+		List<Integer> infoFound = new ArrayList<>();
+		if(key < entries.get(lo).key || key > entries.get(hi).key){
+			return infoFound;
+		}
+		// need to implement binary search
+
+		return infoFound;
 	}
-	
+
+	// completed
 	@Override
 	public void insert(int key, int blockNum) {
-		throw new UnsupportedOperationException();
+		Entry entry = new Entry();
+		ArrayList<BlockCount> list = new ArrayList<>();
+		BlockCount block = new BlockCount();
+		block.blockNo = blockNum;
+		block.count =+1;
+		list.add(block);
+		entry.key = key;
+		entry.blocks = list;
+		if(!entries.contains(entry)){
+			entries.add(entry);
+		}
+
+		// testing purposes
+//		for(int i=0; i < entries.size(); i++){
+//			System.out.print(entries.get(i).key + " ");
+//		}
+//		System.out.println();
 	}
 
 	@Override
@@ -63,8 +90,10 @@ public class OrdIndex implements DBIndex {
 	 * Return the number of entries in the index
 	 * @return
 	 */
+
+	// completed? not sure if this is correct
 	public int size() {
-		return size;
+		return entries.size();
 		// you may find it useful to implement this
 		
 	}
