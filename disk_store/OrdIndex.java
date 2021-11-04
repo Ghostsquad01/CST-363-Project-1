@@ -96,29 +96,67 @@ public class OrdIndex implements DBIndex {
 		return infoFound;
 	}
 
-	// completed
+	// insert function = somewhat-comepleted
+	// need to change how count gets incremented
+		// so every block has a counter on how many keys there are in that block
+		// if there are 4 keys in block 1. then count for block 1 should be 4
+		// emailed the professor for some clarification on the variable
+	// uses binary search to check if there is a duplicated in our entries
 	@Override
 	public void insert(int key, int blockNum) {
-		Entry entry = new Entry();
-		ArrayList<BlockCount> list = new ArrayList<>();
-		BlockCount block = new BlockCount();
-		block.blockNo = blockNum;
-		// not sure about block.count, no clue what they want with that variable
-		block.count =+1;
-		list.add(block);
-		entry.key = key;
-		entry.blocks = list;
-		if(!entries.contains(entry)){
-			entries.add(entry);
-		}
+		Entry entry = new Entry(); // create an entry variable to fill up
+		ArrayList<BlockCount> list = new ArrayList<>(); // create an arrayList storing BlockCount variables
+		BlockCount block = new BlockCount(); // create an BlockCount variable to use to fill our BlockCount arrayList
 
-		// testing purposes
+		block.blockNo = blockNum; // declare and initialize our blockNo variable for our block variable
+		block.count =+1; // not sure about block.count, no clue what they want with that variable
+		list.add(block); // add the block to the BlockCount list
+		entry.key = key; // declare and intialize the key value for the entry
+		entry.blocks = list; // declare and initialize the BlockCount list for the entry
+
+		// no need to check if there is a duplicate
+		// if the entries arrayList is empty
+		// else check if there is a duplicate
+			// if no duplicate, add it to our entries list
+		// use a binary search to check whether there is a duplicate or not
+		if (!entries.isEmpty()) {
+			int lo = 0;
+			int hi = entries.size() - 1;
+			int mid;
+			while (lo < hi) {
+				mid = lo + (hi - lo) / 2;
+				if (entries.get(mid).key == key && entries.get(mid).blocks.get(0).blockNo == blockNum) {
+//					System.out.println("duplicate"); - testing/debugging purposes
+					return; // call a return statement to exit the function, don't want to add this duplicated entry
+				}
+				if (entries.get(hi).key == key && entries.get(hi).blocks.get(0).blockNo == blockNum) {
+//					System.out.println("duplicate");
+					return;
+				}
+				if (entries.get(lo).key == key && entries.get(lo).blocks.get(0).blockNo == blockNum) {
+//					System.out.println("duplicate");
+					return;
+				}
+				// change our low and high points for our binary search
+				if (key < entries.get(mid).key) {
+					hi = mid - 1;
+				} else {
+					lo = mid + 1;
+				}
+			}
+		}
+		entries.add(entry);
+
+		// testing/debugging purposes
 //		for(int i=0; i < entries.size(); i++){
 //			System.out.print(entries.get(i).key + " ");
 //		}
 //		System.out.println();
 	}
 
+	// don't think this is right
+	// not really using count very well
+	// also not sure if this for-loop is okay to use for this function
 	@Override
 	public void delete(int key, int blockNum) {
 		// lookup key 
@@ -126,7 +164,17 @@ public class OrdIndex implements DBIndex {
 		//  decrement count for blockNum.
 		//  if count is now 0, remove the blockNum.
 		//  if there are no block number for this key, remove the key entry.
-		throw new UnsupportedOperationException();
+		
+		if(!lookup(key).isEmpty()){
+			for(int i=0; i < entries.size(); i++){
+				if(entries.get(i).key == key && entries.get(i).blocks.get(0).blockNo == blockNum){
+					entries.remove(i);
+				}
+			}
+		}
+		for(int i=0; i < lookup(key).size(); i++){
+			System.out.println(lookup(key).get(i));
+		}
 	}
 	
 	/**

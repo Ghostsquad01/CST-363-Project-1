@@ -52,7 +52,7 @@ class OrdIndexTest {
 	void testDelete() {
 		idx.delete(2, 1);
 		assertTrue(idx.size() == 6);
-         
+
 		idx.delete(1, 1);
 		assertTrue(idx.size() == 5);
 		
@@ -71,7 +71,7 @@ class OrdIndexTest {
 		List<Integer> result = idx.lookup(2);
 		List<Integer> expected = Arrays.asList(1,2,3);
 		assertTrue(result.size() == 3 && result.containsAll(expected));
-		
+
 		idx.delete(2, 1);
 		result = idx.lookup(2);
 		assertTrue(result.size() == 3 && result.containsAll(expected));
