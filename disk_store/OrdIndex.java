@@ -49,8 +49,50 @@ public class OrdIndex implements DBIndex {
 		if(key < entries.get(lo).key || key > entries.get(hi).key){
 			return infoFound;
 		}
-		// need to implement binary search
 
+//		 linear search - testing purposes
+//		for(int i=0; i < entries.size(); i++){
+//			if(!(infoFound.contains(entries.get(i).blocks.get(0).blockNo)) && entries.get(i).key == key){
+//				infoFound.add(entries.get(i).blocks.get(0).blockNo);
+//			}
+//		}
+//		System.out.println(infoFound);
+
+		// binary search on entries arrayList
+		 while(lo < hi){
+			mid = lo + (hi-lo)/2;
+			if(entries.get(mid).key == key){
+				if(!infoFound.contains(entries.get(mid).blocks.get(0).blockNo)){
+					infoFound.add(entries.get(mid).blocks.get(0).blockNo);
+					lo = mid - 1;
+				}
+			}
+			if(entries.get(hi).key == key){
+				if(!infoFound.contains(entries.get(hi).blocks.get(0).blockNo)){
+					infoFound.add(entries.get(hi).blocks.get(0).blockNo);
+				}
+			}
+			if(entries.get(lo).key == key){
+				if(!infoFound.contains(entries.get(lo).blocks.get(0).blockNo)){
+					infoFound.add(entries.get(lo).blocks.get(0).blockNo);
+				}
+			}
+			if(key < entries.get(mid).key){
+				hi = mid - 1;
+			}else{
+				lo = mid + 1;
+			}
+		}
+		if(entries.get(lo).key == key){
+			if(!infoFound.contains(entries.get(lo).blocks.get(0).blockNo)){
+				infoFound.add(entries.get(lo).blocks.get(0).blockNo);
+			}
+		}
+		if(entries.get(hi).key == key){
+			if(!infoFound.contains(entries.get(hi).blocks.get(0).blockNo)){
+				infoFound.add(entries.get(hi).blocks.get(0).blockNo);
+			}
+		}
 		return infoFound;
 	}
 
@@ -61,6 +103,7 @@ public class OrdIndex implements DBIndex {
 		ArrayList<BlockCount> list = new ArrayList<>();
 		BlockCount block = new BlockCount();
 		block.blockNo = blockNum;
+		// not sure about block.count, no clue what they want with that variable
 		block.count =+1;
 		list.add(block);
 		entry.key = key;
