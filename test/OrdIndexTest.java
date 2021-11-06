@@ -55,10 +55,10 @@ class OrdIndexTest {
 
 		idx.delete(1, 1);
 		assertTrue(idx.size() == 5);
-		
+
 		idx.delete(1, 1);
 		assertTrue(idx.size() == 5);
-		
+
 		idx.delete(2, 2);
 		idx.delete(2, 3);
 		List<Integer> result = idx.lookup(2);
