@@ -208,7 +208,6 @@ public class OrdIndex implements DBIndex {
 		return blockNumsFound;
 	}
 
-	//Remove Duplicates from ArrayList
 	public static List<Integer> removeDups(List<Integer> listToBeEdited)
 	{
 		List<Integer> finalList = new ArrayList<>();
