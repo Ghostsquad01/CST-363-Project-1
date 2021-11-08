@@ -311,19 +311,33 @@ public class HeapDB implements DB, Iterable<Record> {
 		List<Record> result = new ArrayList<Record>();
 
 		// YOUR CODE HERE
-				if (indexes[fieldNum]==null) { 
-					// no index on this column.  do linear scan
-					// add all records into "result"
-					for (Record rec : this) {
-						// ...
-				    }
-					
-				} else {
-					// do index lookup
-					// returns a list of block numbers
-					// call lookupInBlock to get the actual records 
-					// add records into "result'
+		DBIndex index = indexes[fieldNum];
+
+		if (indexes[fieldNum]==null) {
+			// no index on this column.  do linear scan
+			// add all records into "result"
+			List<Integer> blockNumbers = index.lookup(key);
+			for(Integer blockNum:blockNumbers){
+				List<Record> records = lookupInBlock(fieldNum,key,blockNum);
+				for(Record rec:records) {
+					result.add(rec);
 				}
+			}
+
+		} else {
+			// do index lookup
+			// returns a list of block numbers
+			// call lookupInBlock to get the actual records
+			// add records into "result'
+			for (Record rec : this) {
+				IntField field  = (IntField) rec.get(fieldNum);
+				if (key == field.getValue())
+				{
+					result.add(rec);
+				}
+			}
+			return result;
+		}
 
 		// replace the following line with your return statement
 		throw new UnsupportedOperationException();
