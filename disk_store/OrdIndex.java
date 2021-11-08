@@ -64,31 +64,54 @@ public class OrdIndex implements DBIndex {
 
 	@Override
 	public void insert(int key, int blockNum) {
-		size = size +1;
-		boolean checkForMatchingKey = true;
+		size++;
+		if(entries.size() > 0){
+			int whereToInsert = insertSearch(entries, 0, entries.size()-1, key);
 
-		for (int i = 0; i < entries.size(); i++) {
-			if (entries.get(i).key == key) {
-				checkForMatchingKey = false;
+			// check if the key needs to be inserted at the end
+			if(whereToInsert > entries.size()-1){
+				Entry entry = new Entry();
 
-				for (int b = 0; b < entries.get(i).blocks.size(); b++) {
-					if ((entries.get(i).blocks.get(b).blockNo) == blockNum) {
-						entries.get(i).blocks.get(b).count++;
-						break;
-					}else {
-						BlockCount newBlock = new BlockCount();
+				entry.key = key;
 
-						newBlock.blockNo = blockNum;
-						newBlock.count++;
+				ArrayList<BlockCount> listBlock = new ArrayList<>();
+				entry.blocks = listBlock;
 
-						entries.get(i).blocks.add(newBlock);
-						break;
+				BlockCount block = new BlockCount();
+
+				block.blockNo = blockNum;
+				block.count++;
+
+				entry.blocks.add(block);
+
+				entries.add(whereToInsert, entry);
+				return;
+			}else{
+				if(entries.get(whereToInsert).key != key){
+					Entry entry = new Entry();
+					ArrayList<BlockCount> list = new ArrayList<>();
+					BlockCount block = new BlockCount();
+					entry.key = key;
+					block.blockNo = blockNum;
+					block.count++;
+					list.add(block);
+					entry.blocks = list;
+					entries.add(whereToInsert, entry);
+				}else{
+					List blocks = lookup(key);
+					int findBlockNum = deleteBinarySearch(blocks, 0, blocks.size()-1, blockNum);
+					if(findBlockNum != -1){
+						entries.get(whereToInsert).blocks.get(findBlockNum).count++;
+						return;
 					}
+					BlockCount block = new BlockCount();
+					block.blockNo = blockNum;
+					block.count++;
+					entries.get(whereToInsert).blocks.add(block);
+					return;
 				}
 			}
-		}
-
-		if (checkForMatchingKey) {
+		}else {
 			Entry entry = new Entry();
 
 			entry.key = key;
@@ -105,6 +128,7 @@ public class OrdIndex implements DBIndex {
 
 			entries.add(entry);
 		}
+
 	}
 
 	@Override
@@ -115,27 +139,20 @@ public class OrdIndex implements DBIndex {
 		//  if count is now 0, remove the blockNum.
 		//  if there are no block number for this key, remove the key entry.
 
-		if(!lookup(key).isEmpty()){
-			for(int i=0; i < entries.size(); i++){
-				if(entries.get(i).key == key){
-					for(int b=0; b < entries.get(i).blocks.size(); b++){
-						if(entries.get(i).blocks.get(b).blockNo == blockNum){
-							size--;
-							if(entries.get(i).blocks.get(b).count >= 1){
-								entries.get(i).blocks.get(b).count--;
-							}
-							if(entries.get(i).blocks.get(b).count == 0){
-								entries.get(i).blocks.remove(b);
-								break;
-							}
+		int indexExist = binarySearch(entries, 0, entries.size()-1, key);
 
-						}
-					}
-					if(entries.get(i).blocks.size() == 1){
-						entries.remove(i);
-						break;
-					}
+		if(indexExist != -1){
+			List<Integer> blockNums = lookup(key);
+			int findBlockNum = deleteBinarySearch(blockNums, 0, blockNums.size()-1, blockNum);
+			if(findBlockNum != -1){
+				entries.get(indexExist).blocks.get(findBlockNum).count--;
+				if(entries.get(indexExist).blocks.get(findBlockNum).count == 0){
+					size--;
+					entries.get(indexExist).blocks.remove(findBlockNum);
 				}
+			}
+			if(entries.get(indexExist).blocks.size() == 0){
+				entries.remove(indexExist);
 			}
 		}
 	}
@@ -156,28 +173,62 @@ public class OrdIndex implements DBIndex {
 		throw new UnsupportedOperationException();
 	}
 
-	public static int binarySearch(ArrayList<Entry> arr, int lo, int hi, int key) {
+	private static int insertSearch(ArrayList<Entry> arr, int lo, int hi, int key){
+		int mid = lo + (hi - lo) / 2;
 
-		int mid = lo + (hi - lo)/2;
+		while (hi >= lo)
+		{
+			if (arr.get(mid).key == key)
+			{
+				return mid;
+			}
 
-		while (lo <= hi) {
-			//
-			if (arr.get(mid).key < key) {
-				lo = mid + 1;
-			}else if (arr.get(mid).key == key) {
-				//Return found el
-				return arr.get(mid).key;
-			}else {
+			if (arr.get(mid).key > key)
+			{
 				hi = mid - 1;
 			}
 
-			mid = lo + (hi - lo)/2;
+			lo = mid + 1;
+			mid = lo + (hi - lo) / 2;
 		}
+		return mid;
+	}
 
+
+	public static int binarySearch(ArrayList<Entry> arr, int lo, int hi, int key) {
+
+		if (lo <= hi) {
+			int mid = lo + (hi - lo)/2;
+			if (arr.get(mid).key == key) {
+				return mid;
+			}
+			if (arr.get(mid).key < key) {
+				return binarySearch(arr, mid+1, hi, key);
+			} else {
+				return binarySearch(arr, lo, mid-1, key);
+			}
+		}
 		return -1;
 	}
 
-	public static List<Integer>binarySearchForBlock(ArrayList<Entry> arr, int lo, int hi, int key) {
+	private static int deleteBinarySearch(List<Integer> blocks, int lo, int hi, int key){
+		int mid;
+		if(lo <= hi){
+			mid = lo + (hi - lo)/2;
+			if(blocks.get(mid) == key){
+				return mid;
+			}
+			if(blocks.get(mid) > key){
+				return deleteBinarySearch(blocks, lo, mid-1, key);
+			}else{
+				return deleteBinarySearch(blocks, mid+1, hi, key);
+			}
+		}
+		return -1;
+	}
+
+
+	public static List<Integer> binarySearchForBlock(ArrayList<Entry> arr, int lo, int hi, int key) {
 
 		List<Integer> blockNumsFound = new ArrayList<>();
 
