@@ -1,38 +1,41 @@
-package disk_store;
 
-import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.List;
+		package disk_store;
+
+		import java.util.ArrayList;
+		import java.util.List;
 
 /**
  * An ordered index.  Duplicate search key values are allowed,
  * but not duplicate index table entries.  In DB terminology, a
  * search key is not a superkey.
- * 
+ * <p>
  * A limitation of this class is that only single integer search
  * keys are supported.
- *
  */
 
 
 public class OrdIndex implements DBIndex {
-	private ArrayList<Integer> knownIndex = new ArrayList<>();
-	private ArrayList<Integer> knownBlockNo = new ArrayList<>();
-
 
 	private class Entry {
 		int key;
 		ArrayList<BlockCount> blocks;
+
+		public String toString() {
+			return key + " : " + blocks;
+		}
 	}
-	
+
 	private class BlockCount {
 		int blockNo;
-		int count = 0;
+		int count;
+
+		public String toString() {
+			return "[" + blockNo + "," + count + "]";
+		}
 	}
-	
+
 	ArrayList<Entry> entries;
-	int size = 0;
-	
+
 	/**
 	 * Create an new ordered index.
 	 */
@@ -40,235 +43,152 @@ public class OrdIndex implements DBIndex {
 		entries = new ArrayList<>();
 	}
 
+
 	@Override
 	public List<Integer> lookup(int key) {
-		//Get length
-		int lo = 0;
-		int hi = entries.size()-1;
-
-		//Create list
-		List<Integer> blocksFound = new ArrayList<>();
-
-		//Use Binary Search
-		int numExist = binarySearch(entries, lo, hi, key);
-
-		if (numExist != -1) {
-			//Return list of block numbers (no duplicates)
-			blocksFound = binarySearchForBlock(entries, lo, hi, key);
-
-			return blocksFound;
+		// binary search of entries arraylist
+		// return list of block numbers (no duplicates).
+		// if key not found, return empty list
+		List<Integer> distinctBlockNums = new ArrayList<>();
+		if (entries.size() == 0) {
+			return distinctBlockNums;
 		}
-
-		return blocksFound;
+		int l = 0;
+		int r = entries.size() - 1;
+		// binary search
+		while (l <= r) {
+			int m = l + (r - l) / 2;
+			if (entries.get(m).key == key) {
+				if (entries.get(m).blocks.size() > 0) {
+					for (BlockCount grab : entries.get(m).blocks) {
+						distinctBlockNums.add(grab.blockNo);
+					}
+					break;
+				}
+			}
+			if (key > entries.get(m).key) {
+				l = m + 1;
+			} else if (key < entries.get(m).key) {
+				r = m - 1;
+			}
+		}
+		return distinctBlockNums;
 	}
 
 	@Override
 	public void insert(int key, int blockNum) {
-		size++;
-		if(entries.size() > 0){
-			int whereToInsert = insertSearch(entries, 0, entries.size()-1, key);
+		int left = 0;
+		int right = entries.size() - 1;
+		int middle = 0;
+		boolean found_key = false;
+		//binary search
+		while (left <= right) {
 
-			// check if the key needs to be inserted at the end
-			if(whereToInsert > entries.size()-1){
-				Entry entry = new Entry();
+			middle = left + (right - left) / 2;
 
-				entry.key = key;
-
-				ArrayList<BlockCount> listBlock = new ArrayList<>();
-				entry.blocks = listBlock;
-
-				BlockCount block = new BlockCount();
-
-				block.blockNo = blockNum;
-				block.count++;
-
-				entry.blocks.add(block);
-
-				entries.add(whereToInsert, entry);
-				return;
-			}else{
-				if(entries.get(whereToInsert).key != key){
-					Entry entry = new Entry();
-					ArrayList<BlockCount> list = new ArrayList<>();
-					BlockCount block = new BlockCount();
-					entry.key = key;
-					block.blockNo = blockNum;
-					block.count++;
-					list.add(block);
-					entry.blocks = list;
-					entries.add(whereToInsert, entry);
-				}else{
-					List blocks = lookup(key);
-					int findBlockNum = deleteBinarySearch(blocks, 0, blocks.size()-1, blockNum);
-					if(findBlockNum != -1){
-						entries.get(whereToInsert).blocks.get(findBlockNum).count++;
-						return;
-					}
-					BlockCount block = new BlockCount();
-					block.blockNo = blockNum;
-					block.count++;
-					entries.get(whereToInsert).blocks.add(block);
-					return;
-				}
+			if (entries.get(middle).key == key) {
+				found_key = true;
+				break;
 			}
-		}else {
-			Entry entry = new Entry();
-
-			entry.key = key;
-
-			ArrayList<BlockCount> listBlock = new ArrayList<>();
-			entry.blocks = listBlock;
-
-			BlockCount block = new BlockCount();
-
-			block.blockNo = blockNum;
-			block.count++;
-
-			entry.blocks.add(block);
-
-			entries.add(entry);
+			if (entries.get(middle).key < key) {
+				left = middle + 1;
+			} else {
+				right = middle - 1;
+			}
 		}
 
+		if (found_key) { //if a key was found
+			boolean foundBlock = false;
+			//iterate over all blocks
+			for (BlockCount b : entries.get(middle).blocks) {
+				if (b.blockNo == blockNum) {
+					b.count++;
+					foundBlock = true; // flag if block is found
+					break;
+				}
+			}
+			if (!foundBlock) {// if block was not found that means we make a new block and begin its count at 1
+				BlockCount tempBlock = new BlockCount();
+				tempBlock.blockNo = blockNum;
+				tempBlock.count = 1;
+				entries.get(middle).blocks.add(tempBlock);
+			}
+		} else { //if a key was not found
+			Entry newEntry = new Entry(); //create new entry
+			BlockCount newBlockCount = new BlockCount();
+			newEntry.blocks = new ArrayList<>();
+			newEntry.key = key;
+
+			ArrayList<BlockCount> newBlockCountlist = new ArrayList<>();
+			newEntry.blocks = newBlockCountlist;
+			newBlockCount.blockNo = blockNum;
+			newBlockCount.count = 1;
+			newEntry.blocks.add(newBlockCount);
+			entries.add(left, newEntry); //insert entry into the left most part of the array
+		}
 	}
 
 	@Override
 	public void delete(int key, int blockNum) {
-		// lookup key 
+		// lookup key
 		//  if key not found, should not occur.  Ignore it.
 		//  decrement count for blockNum.
 		//  if count is now 0, remove the blockNum.
 		//  if there are no block number for this key, remove the key entry.
-
-		int indexExist = binarySearch(entries, 0, entries.size()-1, key);
-
-		if(indexExist != -1){
-			List<Integer> blockNums = lookup(key);
-			int findBlockNum = deleteBinarySearch(blockNums, 0, blockNums.size()-1, blockNum);
-			if(findBlockNum != -1){
-				entries.get(indexExist).blocks.get(findBlockNum).count--;
-				if(entries.get(indexExist).blocks.get(findBlockNum).count == 0){
-					size--;
-					entries.get(indexExist).blocks.remove(findBlockNum);
+		//throw new UnsupportedOperationException();
+		int left = 0;
+		int right = size() - 1;
+		boolean foundBlock = false;
+		// binary search for key
+		while (left <= right) {
+			int middle = left + (right - left) / 2;
+			if (entries.get(middle).key == key) {
+				boolean deleteBlock = false;
+				List<BlockCount> foundBlockList = new ArrayList<>();
+				for (BlockCount b : entries.get(middle).blocks) {
+					if (b.blockNo == blockNum) {
+						foundBlock = true;// flag decides whether block# was found
+						b.count--;
+					}
+					if (b.count == 0) {
+						deleteBlock = true;
+						foundBlockList.add(b); // add block to list of blocks to be deleted
+					}
+				}
+				if (deleteBlock) {
+					entries.get(middle).blocks.removeAll(foundBlockList); //remove all blocks found
+				}
+				if (entries.get(middle).blocks.size() == 0) {
+					entries.remove(entries.get(middle)); // if it is empty, get rid of entry.
+				}
+				if (foundBlock) {
+					return;
 				}
 			}
-			if(entries.get(indexExist).blocks.size() == 0){
-				entries.remove(indexExist);
+			//binary search
+			if (entries.get(middle).key < key) {
+				left = middle + 1;
+			} else {
+				right = middle - 1;
 			}
 		}
 	}
-	
+
 	/**
 	 * Return the number of entries in the index
+	 *
 	 * @return
 	 */
-
-	// completed? not sure if this is correct
-	public int size() {
-		return size;
-		// you may find it useful to implement this
+	public int size() { //returns the number of blocks in each entry for all entries
+		int count = 0;
+		for (Entry e : entries) {
+			count += e.blocks.size();
+		}
+		return count;
 	}
-	
+
 	@Override
 	public String toString() {
 		throw new UnsupportedOperationException();
-	}
-
-	private static int insertSearch(ArrayList<Entry> arr, int lo, int hi, int key){
-		int mid = lo + (hi - lo) / 2;
-
-		while (hi >= lo)
-		{
-			if (arr.get(mid).key == key)
-			{
-				return mid;
-			}
-
-			if (arr.get(mid).key > key)
-			{
-				hi = mid - 1;
-			}
-
-			lo = mid + 1;
-			mid = lo + (hi - lo) / 2;
-		}
-		return mid;
-	}
-
-
-	public static int binarySearch(ArrayList<Entry> arr, int lo, int hi, int key) {
-
-		if (lo <= hi) {
-			int mid = lo + (hi - lo)/2;
-			if (arr.get(mid).key == key) {
-				return mid;
-			}
-			if (arr.get(mid).key < key) {
-				return binarySearch(arr, mid+1, hi, key);
-			} else {
-				return binarySearch(arr, lo, mid-1, key);
-			}
-		}
-		return -1;
-	}
-
-	private static int deleteBinarySearch(List<Integer> blocks, int lo, int hi, int key){
-		int mid;
-		if(lo <= hi){
-			mid = lo + (hi - lo)/2;
-			if(blocks.get(mid) == key){
-				return mid;
-			}
-			if(blocks.get(mid) > key){
-				return deleteBinarySearch(blocks, lo, mid-1, key);
-			}else{
-				return deleteBinarySearch(blocks, mid+1, hi, key);
-			}
-		}
-		return -1;
-	}
-
-
-	public static List<Integer> binarySearchForBlock(ArrayList<Entry> arr, int lo, int hi, int key) {
-
-		List<Integer> blockNumsFound = new ArrayList<>();
-
-		List<Integer> noDupList;
-
-		int mid = lo + (hi - lo)/2;
-
-		while (lo <= hi) {
-			//
-			if (arr.get(mid).key < key) {
-				lo = mid + 1;
-			}else if (arr.get(mid).key == key) {
-
-				for (int x = 0; x < arr.get(mid).blocks.size(); x++) {
-					blockNumsFound.add(arr.get(mid).blocks.get(x).blockNo);
-				}
-
-				noDupList = removeDups(blockNumsFound);
-
-				return noDupList;
-
-			}else {
-				hi = mid - 1;
-			}
-
-			mid = lo + (hi - lo)/2;
-		}
-		return blockNumsFound;
-	}
-
-	public static List<Integer> removeDups(List<Integer> listToBeEdited)
-	{
-		List<Integer> finalList = new ArrayList<>();
-
-		for (int el : listToBeEdited) {
-			if (!finalList.contains(el)) {
-				finalList.add(el);
-			}
-		}
-
-		return finalList;
 	}
 }

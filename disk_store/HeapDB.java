@@ -1,20 +1,21 @@
-package disk_store;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+
+		package disk_store;
+
+		import java.util.ArrayList;
+		import java.util.Iterator;
+		import java.util.List;
 
 /**
  * A heap file implementation of the DB interface. Record layout within blocks
  * uses a bit map.
- * 
- * @author Glenn 
- * 
- * modified. 3/14/2020 David 
+ *
+ * @author Glenn
+ * <p>
+ * modified. 3/14/2020 David
  * Changed block 1 bitmap.
  * Bit=0 means block has empty row space.
- * Bit=1 means block is full. 
- *
+ * Bit=1 means block is full.
  */
 
 public class HeapDB implements DB, Iterable<Record> {
@@ -82,7 +83,7 @@ public class HeapDB implements DB, Iterable<Record> {
 
 	/**
 	 * Create a new, empty database with the given schema.
-	 * 
+	 *
 	 * @param filename
 	 * @param schema
 	 */
@@ -119,7 +120,7 @@ public class HeapDB implements DB, Iterable<Record> {
 
 	/**
 	 * Open an existing heap database. The schema is read from the database file.
-	 * 
+	 *
 	 * @param filename
 	 * @return
 	 */
@@ -179,7 +180,7 @@ public class HeapDB implements DB, Iterable<Record> {
 	 * Return the number of records in the database. Note: this does a linear
 	 * search, so is slow. It would be better to keep an instance variable that
 	 * tracks the current size.
-	 * 
+	 *
 	 * @return
 	 */
 	public int size() {
@@ -198,91 +199,92 @@ public class HeapDB implements DB, Iterable<Record> {
 		}
 
 		// iterate over valid blocks and see if there is space
-		bf.read(bitmapBlock, blockmapBuffer);      // read the bitmap block
-		int n = blockMap.size();
-		for (int blockNum = bitmapBlock+1; blockNum < n; blockNum++) {
-			if (blockMap.getBit(blockNum)) {
-				// block i is valid, so see if it has room for a new record
-				bf.read(blockNum, buffer);
-				int recNum = recMap.firstZero();
-				if (recNum >= 0) {
-					// write record to buffer, set bit in bit map, write to file
-					int loc = recordLocation(recNum);
-					rec.serialize(buffer.buffer, loc);
-					recMap.setBit(recNum, true);
-					bf.write(blockNum, buffer);
-
-					// index maintenance
-					// YOUR CODE HERE
-
-					//done
-					for(int i = 0; i < schema.size(); i++){
-						if(indexes[i] != null){
-							IntField f  = (IntField) rec.get(i);
-							indexes[i].insert(f.getValue(),blockNum);
-						}
-					}
-
-					//search through indexes to find a null value
-					//	if indexes has non null entry:
-					//		add to index (value if search key from rec, blockNum)
-
-					return true;
+		bf.read(bitmapBlock, blockmapBuffer); // read the bitmap block
+		int blockNum = blockMap.firstZero(); // get first block with space.
+		// check that blockNum is a valid block
+		if (blockNum > 1 && blockNum <= bf.getLastBlockIndex()) {
+			// block i is valid, so see if it has room for a new record
+			bf.read(blockNum, buffer);
+			int recNum = recMap.firstZero();
+			if (recNum >= 0) {
+				// write record to buffer, set bit in bit map, write to file
+				int loc = recordLocation(recNum);
+				rec.serialize(buffer.buffer, loc);
+				recMap.setBit(recNum, true);
+				bf.write(blockNum, buffer);
+				// if block is now full, update blockMap to no space and save blockMap to disk.
+				if (recMap.firstZero() < 0) {
+					blockMap.setBit(blockNum, true);
+					bf.write(bitmapBlock, blockmapBuffer);
 				}
+				// index maintenance
+				// YOUR CODE HERE
+
+				//using IntField we hold that index and then insert it into the indexes array
+				for (int i = 0; i < indexes.length; i++) {
+					if (indexes[i] != null) {
+						// maintain index[i],
+						IntField index = (IntField) rec.get(i);
+						indexes[i].insert(index.getValue(), blockNum);
+						// indexes[i].insert( <<column value from record>>, blockNum );
+					}
+				}
+				return true;
+
 			}
 		}
 
-		// no space in valid blocks, so start a new block
-		int blockNum = blockMap.firstZero();
+		// come here when no space in valid blocks, so start a new block
 		if (blockNum < 0) {
 			// no room left in the database
 			throw new IllegalStateException("Error: insert failed because database is full");
 		}
-
+		int newBlockNum = (int) bf.getLastBlockIndex() + 1;
 		// initialize a new block and retry the insert
 		recMap.clear();
-		bf.write(blockNum, buffer);
-		blockMap.setBit(blockNum, true);
+		bf.write(newBlockNum, buffer);
+		blockMap.setBit(newBlockNum, false);
 		bf.write(bitmapBlock, blockmapBuffer);
 		return insert(rec);
 	}
-
 
 	@Override
 	public boolean delete(int key) {
 		Record rec = schema.blankRecord();
 
 		// search blocks sequentially for the key
-		bf.read(bitmapBlock, blockmapBuffer);      // read the bitmap block
-		for (int blockNum = bitmapBlock+1; blockNum < blockMap.size(); blockNum++) {
-			if (blockMap.getBit(blockNum)) {
-				bf.read(blockNum, buffer);
-				for (int recNum = 0; recNum < recMap.size(); recNum++) {
-					if (recMap.getBit(recNum)) {
-						// record j is present; check its key value
-						int loc = recordLocation(recNum);
-						rec.deserialize(buffer.buffer, loc);
-						if (key == rec.getKey()) {
-							// found it; to delete the record, simply zero the jth
-							// bit in the record bit map
-							recMap.setBit(recNum, false);
-							bf.write(blockNum, buffer);
+		bf.read(bitmapBlock, blockmapBuffer); // read the bitmap block
+		for (int blockNum = bitmapBlock + 1; blockNum <= bf.getLastBlockIndex(); blockNum++) {
 
-							// index maintenance
-							// YOUR CODE HERE
-
-							for(int i = 0; i < schema.size(); i++){
-								if(indexes[i] != null){
-									List<Integer> blockNums = indexes[i].lookup(key);
-
-									for(Integer b:blockNums){
-										indexes[i].delete(key,b);
-									}
-								}
-							}
-
-							return true;
+			bf.read(blockNum, buffer);
+			for (int recNum = 0; recNum < recMap.size(); recNum++) {
+				if (recMap.getBit(recNum)) {
+					// record j is present; check its key value
+					int loc = recordLocation(recNum);
+					rec.deserialize(buffer.buffer, loc);
+					if (key == rec.getKey()) {
+						// found it; to delete the record, simply zero the jth
+						// bit in the record bit map
+						recMap.setBit(recNum, false);
+						bf.write(blockNum, buffer);
+						if (blockMap.getBit(blockNum) == true) {
+							// update blockMap, there is space available in this block now.
+							blockMap.setBit(blockNum, false);
+							bf.write(bitmapBlock, blockmapBuffer);
 						}
+						// index maintenance
+						// YOUR CODE HERE
+
+						//using IntField we hold that index and then delete it from the indexes array
+						for (int i = 0; i < indexes.length; i++) {
+							if (indexes[i] != null) {
+								// maintain index[i],
+								IntField index = (IntField) rec.get(i);
+								indexes[i].delete(index.getValue(), blockNum);
+								// indexes[i].delete(<<column value>>, blockNum );
+							}
+						}
+						return true;
 					}
 				}
 			}
@@ -310,34 +312,38 @@ public class HeapDB implements DB, Iterable<Record> {
 	public List<Record> lookup(String fname, int key) {
 		int fieldNum = schema.getFieldIndex(fname);
 		if (fieldNum < 0) {
-			throw new IllegalArgumentException("Field '"+fname+"' not in schema.");
+			throw new IllegalArgumentException("Field '" + fname + "' not in schema.");
 		}
 
 		List<Record> result = new ArrayList<Record>();
 
 		// YOUR CODE HERE
-
-		DBIndex index = indexes[fieldNum];
-		if(index != null) {
-			List<Integer> blockNumbers = index.lookup(key);
-			for(Integer blockNum:blockNumbers){
-				List<Record> records = lookupInBlock(fieldNum,key,blockNum);
-				for(Record rec:records) {
+		if (indexes[fieldNum] == null) {
+			// no index on this column.  do linear scan
+			// add all records into "result"
+			for (Record rec : this) {
+				IntField num = (IntField) rec.get(fieldNum);
+				if (num.getValue() == key) {
 					result.add(rec);
 				}
 			}
-		}else{
-			for (Record rec : this) {
-				IntField f  = (IntField) rec.get(fieldNum);
-				if (key == f.getValue())
-				{
-					result.add(rec);
-				}
+
+		} else {
+			// do index lookup
+			// returns a list of block numbers
+			// call lookupInBlock to get the actual records
+			// add records into "result"
+			List<Integer> listOfBlockNo = indexes[fieldNum].lookup(key);
+			//lookupInBlock(fieldNum, key, listOfBlockNo);
+//            System.out.println("---\n" + listOfBlockNo + "\n----");
+			for (Integer blockNo : listOfBlockNo) {
+				List<Record> tempListOfRecs = lookupInBlock(fieldNum, key, blockNo);
+				result.addAll(tempListOfRecs);
 			}
 		}
 
-		//if not: iterate through everything in indexes[field num] in a linear search and return all values
-
+		// replace the following line with your return statement
+		//throw new UnsupportedOperationException();
 		return result;
 	}
 
@@ -417,10 +423,12 @@ public class HeapDB implements DB, Iterable<Record> {
 		createHashIndex(schema.getKey());
 	}
 
+	// initialize the given index
 	private void initializeIndex(int fieldNum, DBIndex index) {
 		if (index == null) {
 			throw new IllegalArgumentException("index is null");
 		}
+
 		// YOUR CODE HERE
 		// for each record in the DB, you will need to insert its
 		// index column value and the block number
@@ -428,22 +436,25 @@ public class HeapDB implements DB, Iterable<Record> {
 		// HINT:  see method diagnosticPrint for example of how to
 		// iterate of all data blocks in table and all rows
 		// in each block
-		bf.read(bitmapBlock, blockmapBuffer);      // read the bitmap block
-		for (int blockNum = bitmapBlock+1; blockNum < blockMap.size(); blockNum++) {
-			if (blockMap.getBit(blockNum)) {
-				bf.read(blockNum, buffer);
-				for (int recNum = 0; recNum < recMap.size(); recNum++) {
-					if (recMap.getBit(recNum)) {
-						Record rec = schema.blankRecord();
-						int loc = recordLocation(recNum);
-						rec.deserialize(buffer.buffer, loc);
-						IntField f = (IntField) rec.get(fieldNum);
-						int key = f.getValue();
-						index.insert(key, blockNum);
-					}
+		Record rec = schema.blankRecord();
+
+		// read and print the block bitmap
+		bf.read(bitmapBlock, blockmapBuffer);
+
+		for (int blockNum = bitmapBlock + 1; blockNum <= bf.getLastBlockIndex(); blockNum++) {
+			bf.read(blockNum, buffer);
+			// print the record bitmap of block
+			int recsOnLine = 0;
+			for (int recNum = 0; recNum < recMap.size(); recNum++) {
+				if (recMap.getBit(recNum)) {
+					int loc = recordLocation(recNum);
+					rec.deserialize(buffer.buffer, loc);
+					int key = ((IntField) rec.get(fieldNum)).getValue();
+					index.insert(key, blockNum);
 				}
 			}
 		}
+		//throw new UnsupportedOperationException();
 	}
 
 	/**
@@ -533,20 +544,20 @@ public class HeapDB implements DB, Iterable<Record> {
 
 	/**
 	 * An alternative to toString() that is useful for debugging.
-	 * 
+	 *
 	 * @return
 	 */
 	public String toStringDiagnostic() {
 		StringBuffer sb = new StringBuffer();
 		Record rec = schema.blankRecord();
-		
+
 		// read and print the block bitmap
 		bf.read(bitmapBlock, blockmapBuffer);
 		sb.append("Block bitmap:  " + blockMap);
 
 		for (int blockNum = bitmapBlock + 1; blockNum <= bf.getLastBlockIndex(); blockNum++) {
 			bf.read(blockNum, buffer);
-			// print the record bitmap of block 
+			// print the record bitmap of block
 			sb.append("Block " + blockNum + "\n");
 			sb.append("Record bitmap: " + recMap + "\n");
 			int recsOnLine = 0;
@@ -566,6 +577,7 @@ public class HeapDB implements DB, Iterable<Record> {
 		}
 		return sb.toString();
 	}
+
 	@Override
 	public String toString() {
 		StringBuffer sb = new StringBuffer();
