@@ -220,12 +220,10 @@ public class HeapDB implements DB, Iterable<Record> {
 				// index maintenance
 				// YOUR CODE HERE
 
-				//using IntField we hold that index and then insert it into the indexes array
 				for (int i = 0; i < indexes.length; i++) {
 					if (indexes[i] != null) {
 						// maintain index[i],
-						IntField index = (IntField) rec.get(i);
-						indexes[i].insert(index.getValue(), blockNum);
+						indexes[i].insert(((IntField) rec.get(i)).getValue(), blockNum);
 						// indexes[i].insert( <<column value from record>>, blockNum );
 					}
 				}
@@ -275,12 +273,10 @@ public class HeapDB implements DB, Iterable<Record> {
 						// index maintenance
 						// YOUR CODE HERE
 
-						//using IntField we hold that index and then delete it from the indexes array
 						for (int i = 0; i < indexes.length; i++) {
 							if (indexes[i] != null) {
 								// maintain index[i],
-								IntField index = (IntField) rec.get(i);
-								indexes[i].delete(index.getValue(), blockNum);
+								indexes[i].delete(((IntField) rec.get(i)).getValue(), blockNum);
 								// indexes[i].delete(<<column value>>, blockNum );
 							}
 						}
@@ -322,28 +318,23 @@ public class HeapDB implements DB, Iterable<Record> {
 			// no index on this column.  do linear scan
 			// add all records into "result"
 			for (Record rec : this) {
-				IntField num = (IntField) rec.get(fieldNum);
-				if (num.getValue() == key) {
+				// if the current record has the same key then add it to our results list
+				if (((IntField) rec.get(fieldNum)).getValue() == key) {
 					result.add(rec);
 				}
 			}
-
 		} else {
 			// do index lookup
 			// returns a list of block numbers
 			// call lookupInBlock to get the actual records
 			// add records into "result"
-			List<Integer> listOfBlockNo = indexes[fieldNum].lookup(key);
-			//lookupInBlock(fieldNum, key, listOfBlockNo);
-//            System.out.println("---\n" + listOfBlockNo + "\n----");
-			for (Integer blockNo : listOfBlockNo) {
-				List<Record> tempListOfRecs = lookupInBlock(fieldNum, key, blockNo);
-				result.addAll(tempListOfRecs);
+			List<Integer> multipleBlockNo = indexes[fieldNum].lookup(key);
+			for (Integer blockNo : multipleBlockNo) {
+				List<Record> listRecords = lookupInBlock(fieldNum, key, blockNo);
+				result.addAll(listRecords);
 			}
 		}
-
 		// replace the following line with your return statement
-		//throw new UnsupportedOperationException();
 		return result;
 	}
 
@@ -428,7 +419,6 @@ public class HeapDB implements DB, Iterable<Record> {
 		if (index == null) {
 			throw new IllegalArgumentException("index is null");
 		}
-
 		// YOUR CODE HERE
 		// for each record in the DB, you will need to insert its
 		// index column value and the block number
@@ -436,6 +426,7 @@ public class HeapDB implements DB, Iterable<Record> {
 		// HINT:  see method diagnosticPrint for example of how to
 		// iterate of all data blocks in table and all rows
 		// in each block
+
 		Record rec = schema.blankRecord();
 
 		// read and print the block bitmap
@@ -443,8 +434,6 @@ public class HeapDB implements DB, Iterable<Record> {
 
 		for (int blockNum = bitmapBlock + 1; blockNum <= bf.getLastBlockIndex(); blockNum++) {
 			bf.read(blockNum, buffer);
-			// print the record bitmap of block
-			int recsOnLine = 0;
 			for (int recNum = 0; recNum < recMap.size(); recNum++) {
 				if (recMap.getBit(recNum)) {
 					int loc = recordLocation(recNum);
@@ -454,7 +443,6 @@ public class HeapDB implements DB, Iterable<Record> {
 				}
 			}
 		}
-		//throw new UnsupportedOperationException();
 	}
 
 	/**
@@ -493,7 +481,7 @@ public class HeapDB implements DB, Iterable<Record> {
 			rec = schema.blankRecord();
 			bf.read(bitmapBlock, blockmapBuffer);
 			b = bitmapBlock + 1; // first data block
-			nb = (int) bf.getLastBlockIndex(); // FIX THIS
+			nb = (int) bf.getLastBlockIndex();
 			r = -1; // a value of -1 means block status is unknown
 			nr = recMap.size();
 			findNext();
